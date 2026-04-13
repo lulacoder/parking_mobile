@@ -31,42 +31,38 @@ export default function AppLayout() {
       drawerContent={(props) => <DrawerContent {...props} />}
       screenOptions={defaultScreenOptions}
     >
-      {role === 'admin' && (
-        <Drawer.Screen
-          name="admin"
-          options={{
-            title: 'Admin Dashboard',
-            drawerLabel: 'Dashboard',
-          }}
-        />
-      )}
-      {role === 'owner' && (
-        <Drawer.Screen
-          name="owner"
-          options={{
-            title: 'Owner Dashboard',
-            drawerLabel: 'Dashboard',
-          }}
-        />
-      )}
-      {role === 'operator' && (
-        <Drawer.Screen
-          name="operator"
-          options={{
-            title: 'Operator Dashboard',
-            drawerLabel: 'Dashboard',
-          }}
-        />
-      )}
-      {role === 'driver' && (
-        <Drawer.Screen
-          name="driver"
-          options={{
-            title: 'Driver',
-            drawerLabel: 'Home',
-          }}
-        />
-      )}
+      <Drawer.Screen
+        name="admin"
+        options={{
+          title: 'Admin Dashboard',
+          drawerLabel: 'Dashboard',
+          drawerItemStyle: role === 'admin' ? undefined : { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="owner"
+        options={{
+          title: 'Owner Dashboard',
+          drawerLabel: 'Dashboard',
+          drawerItemStyle: role === 'owner' ? undefined : { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="operator"
+        options={{
+          title: 'Operator Dashboard',
+          drawerLabel: 'Dashboard',
+          drawerItemStyle: role === 'operator' ? undefined : { display: 'none' },
+        }}
+      />
+      <Drawer.Screen
+        name="driver"
+        options={{
+          title: 'Driver',
+          drawerLabel: 'Home',
+          drawerItemStyle: role === 'driver' ? undefined : { display: 'none' },
+        }}
+      />
     </Drawer>
   );
 }

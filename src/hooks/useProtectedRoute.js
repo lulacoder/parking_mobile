@@ -16,9 +16,10 @@ import { sanitizeRole, getRoleHome } from '../utils/roleUtils';
  * 
  * Requirements: 7.7, 8.7, 17.3
  */
-export function useProtectedRoute(allowedRoles = []) {
+export function useProtectedRoute(allowedRoles) {
   const { user, userRole, initializing } = useAuth();
   const router = useRouter();
+  const roles = Array.isArray(allowedRoles) ? allowedRoles : [];
 
   useEffect(() => {
     if (initializing) return;
@@ -31,12 +32,12 @@ export function useProtectedRoute(allowedRoles = []) {
 
     // Check role permissions if allowedRoles is specified
     const role = sanitizeRole(userRole);
-    if (allowedRoles.length > 0 && !allowedRoles.includes(role)) {
+    if (roles.length > 0 && !roles.includes(role)) {
       // Redirect to role-specific home if accessing unauthorized screen
       const roleHome = getRoleHome(role);
       router.replace(`/${roleHome}`);
     }
-  }, [user, userRole, initializing, allowedRoles]);
+  }, [user, userRole, initializing, allowedRoles, roles, router]);
 
   return { user, userRole, initializing };
 }

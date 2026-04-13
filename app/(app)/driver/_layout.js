@@ -8,6 +8,7 @@ export default function DriverLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="scan-qr" />
       <Stack.Screen name="checkin-confirm" />
     </Stack>
   );

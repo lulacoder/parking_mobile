@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+const webAppHost = process.env.WEB_APP_HOST || 'localhost';
+
 export default {
   expo: {
     name: 'Smart Parking',
@@ -17,7 +19,13 @@ export default {
     },
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.smartparking.app'
+      bundleIdentifier: 'com.smartparking.app',
+      config: {
+        googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
+      },
+      infoPlist: {
+        NSCameraUsageDescription: 'We use camera access to scan parking QR codes for check-in.',
+      },
     },
     android: {
       adaptiveIcon: {
@@ -25,16 +33,41 @@ export default {
         backgroundColor: '#ffffff'
       },
       edgeToEdgeEnabled: true,
-      package: 'com.smartparking.app'
+      package: 'com.smartparking.app',
+      permissions: ['CAMERA'],
+      config: {
+        googleMaps: {
+          apiKey: process.env.GOOGLE_MAPS_API_KEY,
+        },
+      },
+      intentFilters: [
+        {
+          action: 'VIEW',
+          autoVerify: false,
+          data: [
+            {
+              scheme: 'https',
+              host: webAppHost,
+              pathPrefix: '/driver/checkin-confirm',
+            },
+          ],
+          category: ['BROWSABLE', 'DEFAULT'],
+        },
+      ],
     },
     web: {
       favicon: './assets/favicon.png'
     },
     plugins: [
-      'expo-router'
+      'expo-router',
+      [
+        'expo-camera',
+        {
+          cameraPermission: 'Allow Smart Parking to access your camera for QR scanning.',
+        },
+      ],
     ],
     extra: {
-      // Firebase configuration from environment variables
       firebaseApiKey: process.env.FIREBASE_API_KEY,
       firebaseAuthDomain: process.env.FIREBASE_AUTH_DOMAIN,
       firebaseDatabaseUrl: process.env.FIREBASE_DATABASE_URL,
@@ -42,11 +75,8 @@ export default {
       firebaseStorageBucket: process.env.FIREBASE_STORAGE_BUCKET,
       firebaseMessagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
       firebaseAppId: process.env.FIREBASE_APP_ID,
-      
-      // Google Maps API key
       googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY,
-      
-      // Firebase emulator configuration
+      webAppHost,
       useFunctionsEmulator: process.env.USE_FUNCTIONS_EMULATOR === 'true',
       functionsEmulatorHost: process.env.FUNCTIONS_EMULATOR_HOST || 'localhost',
       functionsEmulatorPort: parseInt(process.env.FUNCTIONS_EMULATOR_PORT || '5001', 10),

@@ -5,7 +5,9 @@ import DrawerContent from './DrawerContent';
 import { useAuth } from '../../contexts/AuthContext';
 
 // Mock dependencies
-jest.mock('../../contexts/AuthContext');
+jest.mock('../../contexts/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
 jest.mock('@react-navigation/drawer', () => ({
   DrawerContentScrollView: ({ children, ...props }) => {
     const { View } = require('react-native');

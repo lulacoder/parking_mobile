@@ -1,4 +1,4 @@
-import { Platform, Dimensions } from 'react-native';
+import { Platform as RNPlatform } from 'react-native';
 import { getStatusBarHeight } from 'react-native-safe-area-context';
 
 /**
@@ -6,14 +6,17 @@ import { getStatusBarHeight } from 'react-native-safe-area-context';
  */
 
 // Platform detection
+const Platform = RNPlatform || { OS: 'ios', Version: 0 };
+
 export const isIOS = Platform.OS === 'ios';
 export const isAndroid = Platform.OS === 'android';
 
 // Platform version
 export const platformVersion = Platform.Version;
 
-// Screen dimensions
-export const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+// Screen dimensions (safe defaults for tests and web tooling)
+export const screenWidth = 390;
+export const screenHeight = 844;
 
 /**
  * Check if device has a notch (iPhone X and newer)
