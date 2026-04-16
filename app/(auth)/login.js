@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, ScrollView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import Button from '../../src/components/common/Button';
 import Input from '../../src/components/common/Input';
 import SafeAreaWrapper from '../../src/components/common/SafeAreaWrapper';
 import { handleAuthError } from '../../src/utils/errorHandlers';
-import { colors, spacing, typography } from '../../src/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../src/constants/theme';
 import { getKeyboardBehavior, showPlatformAlert } from '../../src/utils/platform';
 import { useFocusManagement, useLoadingAnnouncement } from '../../src/hooks/useFocusManagement';
 
@@ -50,14 +51,11 @@ export default function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container} ref={focusRef}>
-            <Text 
-              style={styles.title}
-              accessible={true}
-              accessibilityRole="header"
-              accessibilityLabel="Welcome Back"
-            >
-              Welcome Back
-            </Text>
+            <View style={styles.brandBadge}>
+              <MaterialIcons name="local-parking" size={24} color={colors.surface} />
+            </View>
+            <Text style={styles.kicker}>Smart Parking</Text>
+            <Text style={styles.title}>Welcome Back</Text>
             <Input
               placeholder="Email"
               value={email}
@@ -119,6 +117,25 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     justifyContent: 'center',
     backgroundColor: colors.background,
+  },
+  brandBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  kicker: {
+    ...typography.small,
+    textAlign: 'center',
+    color: colors.textSecondary,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginBottom: spacing.xs,
   },
   title: {
     ...typography.h1,

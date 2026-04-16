@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
 import { Picker } from '@react-native-picker/picker';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -8,7 +9,7 @@ import Input from '../../src/components/common/Input';
 import { handleAuthError } from '../../src/utils/errorHandlers';
 import { validateEmail, validatePassword } from '../../src/utils/validators';
 import { ALLOWED_ROLES } from '../../src/utils/roleUtils';
-import { colors, spacing, typography } from '../../src/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../src/constants/theme';
 import { showPlatformAlert } from '../../src/utils/platform';
 
 export default function SignupScreen() {
@@ -73,6 +74,9 @@ export default function SignupScreen() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.container}>
+        <View style={styles.brandBadge}>
+          <MaterialIcons name="apartment" size={24} color={colors.surface} />
+        </View>
         <Text 
           style={styles.title}
           accessible={true}
@@ -182,6 +186,17 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     justifyContent: 'center',
   },
+  brandBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: radius.md,
+    backgroundColor: colors.primaryDark,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
   title: {
     ...typography.h1,
     marginBottom: spacing.sm,
@@ -204,10 +219,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   pickerWrapper: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.md,
     overflow: 'hidden',
     minHeight: 44, // Ensure minimum 44x44 touch target
   },

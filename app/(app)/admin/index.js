@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react';
 import { Alert, Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import { useProtectedRoute } from '../../../src/hooks/useProtectedRoute';
 import Input from '../../../src/components/common/Input';
 import Button from '../../../src/components/common/Button';
-import { colors, spacing, typography } from '../../../src/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../../src/constants/theme';
 import {
   useAdminAnalytics,
   useAssignOperatorToParking,
@@ -156,7 +157,10 @@ export default function AdminHomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Admin Dashboard</Text>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>Platform Intelligence</Text>
+        <Text style={styles.title}>Admin Dashboard</Text>
+      </View>
 
       <Card title="Analytics Range">
         <View style={styles.row}>
@@ -314,7 +318,12 @@ export default function AdminHomeScreen() {
 function Card({ title, children }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardIconWrap}>
+          <MaterialIcons name="insights" size={16} color={colors.primaryDark} />
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -323,16 +332,36 @@ function Card({ title, children }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  title: { ...typography.h1, color: colors.text, marginBottom: spacing.md },
+  hero: {
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  kicker: { ...typography.small, color: '#BFDBFE', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: spacing.xs },
+  title: { ...typography.h1, color: colors.surface },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.card,
   },
-  cardTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  cardIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: { ...typography.h3, color: colors.text },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
   chart: { marginVertical: spacing.sm, borderRadius: 8 },
@@ -340,8 +369,9 @@ const styles = StyleSheet.create({
   listItem: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.md,
     padding: spacing.sm,
     marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
   },
 });

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
 import { useProtectedRoute } from '../../../src/hooks/useProtectedRoute';
 import { auth, firestore } from '../../../src/config/firebase';
-import { colors, spacing, typography } from '../../../src/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../../src/constants/theme';
 import Input from '../../../src/components/common/Input';
 import Button from '../../../src/components/common/Button';
 import { operatorFunctions } from '../../../src/utils/functions';
@@ -283,7 +284,10 @@ export default function OperatorHomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Operator Dashboard</Text>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>Operations</Text>
+        <Text style={styles.title}>Operator Dashboard</Text>
+      </View>
       {listenerWarning ? (
         <View style={styles.warningBanner}>
           <Text style={styles.warningText}>{listenerWarning}</Text>
@@ -463,7 +467,12 @@ export default function OperatorHomeScreen() {
 function Card({ title, children }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardIconWrap}>
+          <MaterialIcons name="dashboard" size={16} color={colors.primaryDark} />
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -472,16 +481,36 @@ function Card({ title, children }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  title: { ...typography.h1, color: colors.text, marginBottom: spacing.md },
+  hero: {
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  kicker: { ...typography.small, color: '#BFDBFE', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: spacing.xs },
+  title: { ...typography.h1, color: colors.surface },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.card,
   },
-  cardTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  cardIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: { ...typography.h3, color: colors.text },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
   warningText: { ...typography.caption, color: colors.warning, marginBottom: spacing.xs },

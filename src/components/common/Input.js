@@ -1,6 +1,6 @@
 import React from 'react';
 import { TextInput, StyleSheet, View, Text } from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { colors, radius, spacing, typography } from '../../constants/theme';
 import { getPlatformInputStyle } from '../../utils/platform';
 
 export default function Input({ 
@@ -69,15 +69,17 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   input: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
     fontSize: 16,
     color: colors.text,
     minHeight: 44, // Ensure minimum 44x44 touch target
+    borderWidth: 1,
+    borderRadius: radius.md,
   },
   inputError: {
     borderColor: colors.danger,
-    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
   },
   inputDisabled: {
     backgroundColor: colors.background,

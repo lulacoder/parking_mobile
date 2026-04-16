@@ -9,13 +9,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import { useProtectedRoute } from '../../../src/hooks/useProtectedRoute';
 import Input from '../../../src/components/common/Input';
 import Button from '../../../src/components/common/Button';
 import { auth, firestore } from '../../../src/config/firebase';
-import { colors, spacing, typography } from '../../../src/constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../../src/constants/theme';
 import { driverFunctions } from '../../../src/utils/functions';
 import { getParkingPaymentDetails, listPendingPaymentsForDriver } from '../../../src/services/api';
 import { estimateCharge, normalizePlate, parkingCoords, toDateTime } from '../../../src/services/time';
@@ -217,7 +218,10 @@ export default function DriverHomeScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Driver Dashboard</Text>
+      <View style={styles.hero}>
+        <Text style={styles.kicker}>Mobility</Text>
+        <Text style={styles.title}>Driver Dashboard</Text>
+      </View>
 
       <Card title="QR Check-In">
         <Text style={styles.smallText}>Scan operator QR with your phone camera or paste token/link.</Text>
@@ -414,7 +418,12 @@ export default function DriverHomeScreen() {
 function Card({ title, children }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.cardHeader}>
+        <View style={styles.cardIconWrap}>
+          <MaterialIcons name="grid-view" size={16} color={colors.primaryDark} />
+        </View>
+        <Text style={styles.cardTitle}>{title}</Text>
+      </View>
       {children}
     </View>
   );
@@ -423,16 +432,36 @@ function Card({ title, children }) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   content: { padding: spacing.md, paddingBottom: spacing.xxl },
-  title: { ...typography.h1, color: colors.text, marginBottom: spacing.md },
+  hero: {
+    backgroundColor: colors.primaryDark,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  kicker: { ...typography.small, color: '#BFDBFE', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: spacing.xs },
+  title: { ...typography.h1, color: colors.surface },
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: radius.lg,
     padding: spacing.md,
     marginBottom: spacing.md,
+    ...shadows.card,
   },
-  cardTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
+  cardIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cardTitle: { ...typography.h3, color: colors.text },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
   warning: { ...typography.caption, color: colors.warning, marginBottom: spacing.sm },
@@ -441,10 +470,10 @@ const styles = StyleSheet.create({
   chip: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.md,
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.sm,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surfaceMuted,
   },
   chipActive: { borderColor: colors.primary, backgroundColor: '#dbeafe' },
   chipTitle: { ...typography.caption, color: colors.text, fontWeight: '600' },
@@ -462,9 +491,10 @@ const styles = StyleSheet.create({
   listItem: {
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: radius.md,
     padding: spacing.sm,
     marginBottom: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
   },
   pendingText: { ...typography.small, color: colors.info, marginVertical: spacing.xs },
   modalBackdrop: {
@@ -475,7 +505,7 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { colors, spacing, typography } from '../../constants/theme';
+import { colors, radius, shadows, spacing, typography } from '../../constants/theme';
 import { getPlatformButtonStyle, triggerHapticFeedback } from '../../utils/platform';
 
 export default function Button({ 
@@ -34,10 +34,10 @@ export default function Button({
     <TouchableOpacity
       style={[
         styles.button,
-        platformButtonStyle,
-        variant === 'primary' && styles.primaryButton,
+        variant === 'primary' && [styles.primaryButton, shadows.button],
         variant === 'secondary' && styles.secondaryButton,
         isDisabled && styles.disabledButton,
+        platformButtonStyle,
         style,
       ]}
       onPress={handlePress}
@@ -76,32 +76,39 @@ export default function Button({
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 8,
-    padding: spacing.md,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: spacing.sm,
+    marginVertical: spacing.xs,
     minHeight: 44, // Ensure minimum 44x44 touch target
     minWidth: 44,
+    borderWidth: 1,
   },
   primaryButton: {
     backgroundColor: colors.primary,
+    borderColor: colors.primaryDark,
   },
   secondaryButton: {
-    backgroundColor: colors.secondary,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
   },
   disabledButton: {
-    backgroundColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   buttonText: {
     ...typography.body,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   primaryButtonText: {
     color: colors.surface,
   },
   secondaryButtonText: {
-    color: colors.surface,
+    color: colors.primaryDark,
   },
   disabledButtonText: {
     color: colors.textSecondary,

@@ -60,18 +60,18 @@ export const getSafeAreaInsets = () => {
 export const getNavigationOptions = () => {
   return {
     headerStyle: {
-      backgroundColor: isIOS ? '#F9FAFB' : '#3B82F6',
-      elevation: isAndroid ? 4 : 0,
-      shadowOpacity: isIOS ? 0.1 : 0,
-      shadowRadius: isIOS ? 4 : 0,
-      shadowOffset: isIOS ? { width: 0, height: 2 } : { width: 0, height: 0 },
+      backgroundColor: '#1D4ED8',
+      elevation: isAndroid ? 8 : 0,
+      shadowOpacity: isIOS ? 0.22 : 0,
+      shadowRadius: isIOS ? 10 : 0,
+      shadowOffset: isIOS ? { width: 0, height: 4 } : { width: 0, height: 0 },
     },
     headerTitleStyle: {
-      color: isIOS ? '#111827' : '#FFFFFF',
-      fontSize: isIOS ? 17 : 20,
-      fontWeight: isIOS ? '600' : 'bold',
+      color: '#FFFFFF',
+      fontSize: isIOS ? 22 : 24,
+      fontWeight: '800',
     },
-    headerTintColor: isIOS ? '#3B82F6' : '#FFFFFF',
+    headerTintColor: '#FFFFFF',
     animation: isIOS ? 'slide_from_right' : 'slide_from_bottom',
   };
 };
@@ -156,8 +156,8 @@ export const triggerHapticFeedback = (type = 'light') => {
  */
 export const getStatusBarConfig = () => {
   return {
-    style: isIOS ? 'dark' : 'light',
-    backgroundColor: isAndroid ? '#3B82F6' : 'transparent',
+    style: 'light',
+    backgroundColor: isAndroid ? '#1D4ED8' : 'transparent',
     translucent: isAndroid,
   };
 };
