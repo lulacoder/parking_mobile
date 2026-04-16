@@ -22,6 +22,8 @@ export default function AppLayout() {
   const defaultScreenOptions = {
     headerShown: true,
     drawerType: 'front',
+    lazy: true,
+    freezeOnBlur: true,
     ...navigationOptions,
     ...gestureConfig,
   };

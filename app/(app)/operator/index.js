@@ -21,11 +21,24 @@ export default function OperatorHomeScreen() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
   const [pendingPayments, setPendingPayments] = useState([]);
+  const [pendingPaymentsError, setPendingPaymentsError] = useState('');
+  const [listenerWarning, setListenerWarning] = useState('');
+  const [qrError, setQrError] = useState('');
 
   const [qrPayload, setQrPayload] = useState(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrRefreshNonce, setQrRefreshNonce] = useState(0);
   const [actionLoading, setActionLoading] = useState('');
+
+  const isPermissionDenied = (error) =>
+    String(error?.code || '').includes('permission-denied') ||
+    String(error?.message || '').toLowerCase().includes('insufficient permission');
+
+  const isServiceUnavailable = (error) =>
+    String(error?.code || '').includes('unavailable') ||
+    String(error?.message || '').toLowerCase().includes('service unavailable');
+
+  const getErrorMessage = (error, fallback) => error?.message || fallback;
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -40,11 +53,17 @@ export default function OperatorHomeScreen() {
           setSelectedParkingId(assigned[0]);
         }
       },
-      () => Alert.alert('Error', 'Failed to load operator profile')
+      (error) => {
+        if (isPermissionDenied(error)) {
+          setListenerWarning('Permissions are limited for some operator data.');
+          return;
+        }
+        setListenerWarning(getErrorMessage(error, 'Failed to load operator profile.'));
+      }
     );
 
     return () => unsub();
-  }, [selectedParkingId, qrRefreshNonce]);
+  }, [selectedParkingId]);
 
   useEffect(() => {
     if (!assignedParkingIds.length) {
@@ -88,7 +107,14 @@ export default function OperatorHomeScreen() {
           requests.sort((a, b) => toMs(b.requestedAt || b.createdAt) - toMs(a.requestedAt || a.createdAt));
           setPendingRequests(requests);
         },
-        () => Alert.alert('Error', 'Failed to load pending check-in requests')
+        (error) => {
+          if (isPermissionDenied(error)) {
+            setPendingRequests([]);
+            setListenerWarning('Permissions are limited for some operator data.');
+            return;
+          }
+          setListenerWarning(getErrorMessage(error, 'Failed to load pending check-in requests'));
+        }
       );
 
     return () => unsub();
@@ -106,7 +132,14 @@ export default function OperatorHomeScreen() {
       .where('status', '==', 'active')
       .onSnapshot(
         (snapshot) => setActiveSessions(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-        () => Alert.alert('Error', 'Failed to load active sessions')
+        (error) => {
+          if (isPermissionDenied(error)) {
+            setActiveSessions([]);
+            setListenerWarning('Permissions are limited for some operator data.');
+            return;
+          }
+          setListenerWarning(getErrorMessage(error, 'Failed to load active sessions'));
+        }
       );
 
     return () => unsub();
@@ -124,8 +157,17 @@ export default function OperatorHomeScreen() {
         const result = await listPendingPaymentsForOperator(selectedParkingId);
         if (!mounted) return;
         setPendingPayments(Array.isArray(result?.pendingPayments) ? result.pendingPayments : []);
+        setPendingPaymentsError('');
+        setListenerWarning('');
       } catch (_) {
-        if (mounted) Alert.alert('Error', 'Failed to load pending payments');
+        if (mounted) {
+          if (isPermissionDenied(_) || isServiceUnavailable(_)) {
+            setPendingPaymentsError('Pending payments are temporarily unavailable.');
+            setPendingPayments([]);
+            return;
+          }
+          setPendingPaymentsError('Failed to load pending payments.');
+        }
       }
     };
 
@@ -150,8 +192,22 @@ export default function OperatorHomeScreen() {
         const payload = await operatorFunctions.createParkingCheckInToken(selectedParkingId);
         if (!mounted) return;
         setQrPayload(payload);
+        setQrError('');
       } catch (error) {
-        if (mounted) Alert.alert('Error', error.message || 'Failed to create QR token');
+        if (mounted) {
+          if (isPermissionDenied(error)) {
+            setQrPayload(null);
+            setQrError('Missing or insufficient permissions for QR generation.');
+            return;
+          }
+          if (isServiceUnavailable(error)) {
+            setQrPayload(null);
+            setQrError('QR service unavailable. Check emulator/network connection.');
+            return;
+          }
+          setQrPayload(null);
+          setQrError(getErrorMessage(error, 'Failed to create QR token.'));
+        }
       } finally {
         if (mounted) setQrLoading(false);
       }
@@ -164,7 +220,7 @@ export default function OperatorHomeScreen() {
       mounted = false;
       clearInterval(timer);
     };
-  }, [selectedParkingId]);
+  }, [selectedParkingId, qrRefreshNonce]);
 
   if (initializing) return null;
 
@@ -177,6 +233,13 @@ export default function OperatorHomeScreen() {
     setActionLoading(name);
     try {
       await work();
+    } catch (error) {
+      const msg = getErrorMessage(error, 'Action failed.');
+      if (isPermissionDenied(error)) {
+        setListenerWarning('Your operator account lacks required permissions for this action.');
+        return;
+      }
+      Alert.alert('Error', msg);
     } finally {
       setActionLoading('');
     }
@@ -221,6 +284,11 @@ export default function OperatorHomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       <Text style={styles.title}>Operator Dashboard</Text>
+      {listenerWarning ? (
+        <View style={styles.warningBanner}>
+          <Text style={styles.warningText}>{listenerWarning}</Text>
+        </View>
+      ) : null}
 
       <Card title="Assigned Parking">
         {!parkings.length ? (
@@ -267,7 +335,7 @@ export default function OperatorHomeScreen() {
             />
           </>
         ) : (
-          <Text style={styles.smallText}>QR unavailable.</Text>
+          <Text style={styles.smallText}>{qrError || 'QR unavailable.'}</Text>
         )}
       </Card>
 
@@ -358,6 +426,7 @@ export default function OperatorHomeScreen() {
       </Card>
 
       <Card title="Pending Payments">
+        {pendingPaymentsError ? <Text style={styles.warningText}>{pendingPaymentsError}</Text> : null}
         {!pendingPayments.length ? (
           <Text style={styles.smallText}>No pending payments.</Text>
         ) : (
@@ -415,6 +484,15 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.h3, color: colors.text, marginBottom: spacing.sm },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
+  warningText: { ...typography.caption, color: colors.warning, marginBottom: spacing.xs },
+  warningBanner: {
+    backgroundColor: '#fef3c7',
+    borderColor: '#f59e0b',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
   selectorWrap: { gap: spacing.xs },
   inlineStats: { marginTop: spacing.sm, gap: spacing.xs },
   qrWrap: {

@@ -33,6 +33,7 @@ export default {
         backgroundColor: '#ffffff'
       },
       edgeToEdgeEnabled: true,
+      usesCleartextTraffic: true,
       package: 'com.smartparking.app',
       permissions: ['CAMERA'],
       config: {

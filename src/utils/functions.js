@@ -2,7 +2,7 @@
  * Firebase callable functions utility with consistent error handling.
  */
 
-import { functionsClient } from '../config/firebase';
+import { functionsClient, functionsProdClient, isUsingFunctionsEmulator } from '../config/firebase';
 import { handleNetworkError } from './errorHandlers';
 
 function normalizeCode(code) {
@@ -11,12 +11,34 @@ function normalizeCode(code) {
 }
 
 export const callFunction = async (functionName, data = {}) => {
-  try {
-    const callable = functionsClient.httpsCallable(functionName);
+  const invoke = async (client) => {
+    const callable = client.httpsCallable(functionName);
     const result = await callable(data);
     return result.data;
+  };
+
+  try {
+    return await invoke(functionsClient);
   } catch (error) {
     const code = normalizeCode(error?.code);
+    const message = String(error?.message || '').toLowerCase();
+    const shouldTryProdFallback =
+      isUsingFunctionsEmulator &&
+      (code === 'deadline-exceeded' ||
+        code === 'unavailable' ||
+        code === 'internal' ||
+        message.includes('network') ||
+        message.includes('timeout') ||
+        message.includes('timed out') ||
+        message.includes('failed to fetch'));
+
+    if (shouldTryProdFallback) {
+      try {
+        return await invoke(functionsProdClient);
+      } catch (_) {
+        // fall through to original error mapping from emulator failure
+      }
+    }
 
     switch (code) {
       case 'unauthenticated':
@@ -32,8 +54,11 @@ export const callFunction = async (functionName, data = {}) => {
       case 'failed-precondition':
       case 'invalid-argument':
       case 'unavailable':
-      case 'deadline-exceeded':
         throw new Error(error?.message || 'Operation failed. Please try again.');
+      case 'deadline-exceeded':
+        throw new Error('Request timed out. Emulator or backend may be unreachable. Check network/emulator host and try again.');
+      case 'internal':
+        throw new Error(error?.message || 'Internal server error from backend.');
       default:
         throw new Error(handleNetworkError(error));
     }

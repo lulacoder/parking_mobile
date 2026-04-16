@@ -30,6 +30,7 @@ export default function DriverHomeScreen() {
   const [activeBookings, setActiveBookings] = useState([]);
   const [activeSessions, setActiveSessions] = useState([]);
   const [pendingPayments, setPendingPayments] = useState([]);
+  const [pendingPaymentsError, setPendingPaymentsError] = useState('');
   const [manualQrInput, setManualQrInput] = useState('');
   const [loadingReserve, setLoadingReserve] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
@@ -88,8 +89,12 @@ export default function DriverHomeScreen() {
         const result = await listPendingPaymentsForDriver();
         if (!mounted) return;
         setPendingPayments(Array.isArray(result?.pendingPayments) ? result.pendingPayments : []);
+        setPendingPaymentsError('');
       } catch (_) {
-        if (mounted) Alert.alert('Error', 'Failed to load pending payments');
+        if (mounted) {
+          setPendingPayments([]);
+          setPendingPaymentsError('Pending payments are temporarily unavailable.');
+        }
       }
     };
 
@@ -326,6 +331,7 @@ export default function DriverHomeScreen() {
       </Card>
 
       <Card title="Pending Payment Confirmations">
+        {pendingPaymentsError ? <Text style={styles.warning}>{pendingPaymentsError}</Text> : null}
         {!pendingPayments.length ? (
           <Text style={styles.smallText}>No pending payment confirmations.</Text>
         ) : (
