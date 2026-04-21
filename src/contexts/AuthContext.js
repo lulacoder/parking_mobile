@@ -1,8 +1,9 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef } from 'react';
 import { Alert } from 'react-native';
 import { auth, firestore } from '../config/firebase';
 import { sanitizeRole, FALLBACK_ROLE } from '../utils/roleUtils';
 import { handleNetworkError } from '../utils/errorHandlers';
+import { queryClient } from '../lib/queryClient';
 
 const AuthContext = createContext({});
 
@@ -11,6 +12,7 @@ export const AuthProvider = ({ children }) => {
   const [userRole, setUserRole] = useState(FALLBACK_ROLE);
   const [loading, setLoading] = useState(true);
   const [initializing, setInitializing] = useState(true);
+  const previousUidRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -24,7 +26,14 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = auth.onAuthStateChanged(
       async (currentUser) => {
         if (!mounted) return;
+        const currentUid = currentUser?.uid || null;
+        if (previousUidRef.current !== currentUid) {
+          queryClient.clear();
+          previousUidRef.current = currentUid;
+        }
+
         setLoading(true);
+        setInitializing(true);
 
         if (!currentUser) {
           setUser(null);

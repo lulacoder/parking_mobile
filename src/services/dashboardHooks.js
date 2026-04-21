@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { firestore } from '../config/firebase';
+import { auth } from '../config/firebase';
 import {
   getAdminAnalytics,
   getOwnerAnalytics,
@@ -13,11 +14,11 @@ import {
 } from './api';
 
 const qk = {
-  adminAnalytics: (range) => ['adminAnalytics', range],
-  ownerAnalytics: (range) => ['ownerAnalytics', range],
-  owners: ['ownersList'],
-  parkings: ['parkingsList'],
-  operators: ['operatorsList'],
+  adminAnalytics: (range, uid) => ['adminAnalytics', uid || auth.currentUser?.uid || 'anon', range],
+  ownerAnalytics: (range, uid) => ['ownerAnalytics', uid || auth.currentUser?.uid || 'anon', range],
+  owners: (uid) => ['ownersList', uid || auth.currentUser?.uid || 'anon'],
+  parkings: (uid) => ['parkingsList', uid || auth.currentUser?.uid || 'anon'],
+  operators: (uid) => ['operatorsList', uid || auth.currentUser?.uid || 'anon'],
 };
 
 async function loadOwners() {
@@ -50,15 +51,15 @@ export function useOwnerAnalytics(range = '30d') {
 }
 
 export function useOwnersList() {
-  return useQuery({ queryKey: qk.owners, queryFn: loadOwners });
+  return useQuery({ queryKey: qk.owners(), queryFn: loadOwners });
 }
 
 export function useParkingsList() {
-  return useQuery({ queryKey: qk.parkings, queryFn: loadParkings });
+  return useQuery({ queryKey: qk.parkings(), queryFn: loadParkings });
 }
 
 export function useOperatorsList() {
-  return useQuery({ queryKey: qk.operators, queryFn: loadOperators });
+  return useQuery({ queryKey: qk.operators(), queryFn: loadOperators });
 }
 
 function useRefreshAfterMutation(keys = []) {
@@ -71,17 +72,17 @@ function useRefreshAfterMutation(keys = []) {
 }
 
 export function useCreateOwnerAccount() {
-  const handlers = useRefreshAfterMutation([qk.owners, qk.adminAnalytics('7d'), qk.adminAnalytics('30d')]);
+  const handlers = useRefreshAfterMutation([qk.owners(), qk.adminAnalytics('7d'), qk.adminAnalytics('30d')]);
   return useMutation({ mutationFn: createOwnerAccount, ...handlers });
 }
 
 export function useUpsertParking() {
-  const handlers = useRefreshAfterMutation([qk.parkings, qk.adminAnalytics('7d'), qk.adminAnalytics('30d')]);
+  const handlers = useRefreshAfterMutation([qk.parkings(), qk.adminAnalytics('7d'), qk.adminAnalytics('30d')]);
   return useMutation({ mutationFn: upsertParking, ...handlers });
 }
 
 export function useAssignOperatorToParking() {
-  const handlers = useRefreshAfterMutation([qk.operators, qk.parkings]);
+  const handlers = useRefreshAfterMutation([qk.operators(), qk.parkings()]);
   return useMutation({ mutationFn: assignOperatorToParking, ...handlers });
 }
 

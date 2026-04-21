@@ -1,23 +1,32 @@
 import { useEffect } from 'react';
 import { Drawer } from 'expo-router/drawer';
-import { useRouter } from 'expo-router';
+import { usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { sanitizeRole } from '../../src/utils/roleUtils';
+import { getRoleHome, sanitizeRole } from '../../src/utils/roleUtils';
 import DrawerContent from '../../src/components/navigation/DrawerContent';
 import { getNavigationOptions, getGestureConfig } from '../../src/utils/platform';
 
 export default function AppLayout() {
-  const { user, userRole } = useAuth();
+  const { user, userRole, initializing } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const role = sanitizeRole(userRole);
   const navigationOptions = getNavigationOptions();
   const gestureConfig = getGestureConfig();
 
   useEffect(() => {
+    if (initializing) return;
+
     if (!user) {
       router.replace('/login');
+      return;
     }
-  }, [user]);
+
+    const roleHome = `/${getRoleHome(role)}`;
+    if (!pathname.startsWith(roleHome)) {
+      router.replace(roleHome);
+    }
+  }, [initializing, pathname, role, router, user]);
 
   const defaultScreenOptions = {
     headerShown: true,

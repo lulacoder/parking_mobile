@@ -2,6 +2,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import { useRouter, usePathname } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { sanitizeRole } from '../../utils/roleUtils';
 import { usePlatformSafeArea } from '../common/SafeAreaWrapper';
 import { colors, radius, shadows, spacing, typography } from '../../constants/theme';
 import { showPlatformAlert, triggerHapticFeedback, getPlatformButtonStyle } from '../../utils/platform';
@@ -10,6 +11,7 @@ export default function DrawerContent() {
   const { user, userRole, signOut } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const role = sanitizeRole(userRole);
   const safeArea = usePlatformSafeArea();
   const platformButtonStyle = getPlatformButtonStyle();
 
@@ -25,6 +27,7 @@ export default function DrawerContent() {
           try {
             triggerHapticFeedback('success');
             await signOut();
+            router.replace('/login');
           } catch (_) {
             triggerHapticFeedback('error');
             showPlatformAlert('Error', 'Failed to sign out. Please try again.');
@@ -40,16 +43,16 @@ export default function DrawerContent() {
   };
 
   const getMenuItems = () => {
-    if (userRole === 'admin') {
+    if (role === 'admin') {
       return [{ key: 'admin', label: 'Dashboard', icon: 'admin-panel-settings', path: '/admin', isActive: pathname.startsWith('/admin') }];
     }
-    if (userRole === 'owner') {
+    if (role === 'owner') {
       return [{ key: 'owner', label: 'Dashboard', icon: 'business', path: '/owner', isActive: pathname.startsWith('/owner') }];
     }
-    if (userRole === 'operator') {
+    if (role === 'operator') {
       return [{ key: 'operator', label: 'Dashboard', icon: 'qr-code-scanner', path: '/operator', isActive: pathname.startsWith('/operator') }];
     }
-    if (userRole === 'driver') {
+    if (role === 'driver') {
       return [
         { key: 'driver', label: 'Home', icon: 'directions-car-filled', path: '/driver', isActive: pathname === '/driver' },
         { key: 'scan-qr', label: 'Scan QR', icon: 'qr-code-scanner', path: '/driver/scan-qr', isActive: pathname === '/driver/scan-qr' },
@@ -78,7 +81,7 @@ export default function DrawerContent() {
           {user ? (
             <View style={styles.userInfo}>
               <Text style={styles.userEmail}>{user.email}</Text>
-              <Text style={styles.userRole}>{String(userRole || '').toUpperCase()}</Text>
+              <Text style={styles.userRole}>{String(role || '').toUpperCase()}</Text>
             </View>
           ) : null}
         </View>
