@@ -19,7 +19,7 @@ import { auth, firestore } from '../../../src/config/firebase';
 import { colors, radius, shadows, spacing, typography } from '../../../src/constants/theme';
 import { driverFunctions } from '../../../src/utils/functions';
 import { getParkingPaymentDetails, listPendingPaymentsForDriver } from '../../../src/services/api';
-import { estimateCharge, normalizePlate, parkingCoords, toDateTime } from '../../../src/services/time';
+import { estimateCharge, normalizePlate, parkingCoords, toDateTime, toMs } from '../../../src/services/time';
 
 export default function DriverHomeScreen() {
   const { initializing } = useProtectedRoute(['driver']);
@@ -32,6 +32,7 @@ export default function DriverHomeScreen() {
   const [activeSessions, setActiveSessions] = useState([]);
   const [pendingPayments, setPendingPayments] = useState([]);
   const [pendingPaymentsError, setPendingPaymentsError] = useState('');
+  const [uiBanner, setUiBanner] = useState({ type: '', message: '' });
   const [manualQrInput, setManualQrInput] = useState('');
   const [loadingReserve, setLoadingReserve] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState('');
@@ -56,7 +57,7 @@ export default function DriverHomeScreen() {
             setSelectedParkingId(list[0].id);
           }
         },
-        (error) => Alert.alert('Error', error.message || 'Failed to load parkings')
+        (error) => setUiBanner({ type: 'error', message: error.message || 'Failed to load parkings' })
       );
 
     return () => unsubscribe();
@@ -71,8 +72,18 @@ export default function DriverHomeScreen() {
       .where('driverId', '==', uid)
       .where('status', 'in', ['reserved', 'checked_in'])
       .onSnapshot(
-        (snapshot) => setActiveBookings(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-        (error) => Alert.alert('Error', error.message || 'Failed to load bookings')
+        (snapshot) => {
+          const now = Date.now();
+          const list = snapshot.docs
+            .map((doc) => ({ id: doc.id, ...doc.data() }))
+            .filter((booking) => {
+              if (booking.status !== 'reserved') return true;
+              const expiresMs = toMs(booking.expiresAt);
+              return !expiresMs || expiresMs > now;
+            });
+          setActiveBookings(list);
+        },
+        (error) => setUiBanner({ type: 'error', message: error.message || 'Failed to load bookings' })
       );
 
     const unsubSessions = firestore
@@ -81,7 +92,7 @@ export default function DriverHomeScreen() {
       .where('status', '==', 'active')
       .onSnapshot(
         (snapshot) => setActiveSessions(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
-        (error) => Alert.alert('Error', error.message || 'Failed to load sessions')
+        (error) => setUiBanner({ type: 'error', message: error.message || 'Failed to load sessions' })
       );
 
     let mounted = true;
@@ -91,6 +102,7 @@ export default function DriverHomeScreen() {
         if (!mounted) return;
         setPendingPayments(Array.isArray(result?.pendingPayments) ? result.pendingPayments : []);
         setPendingPaymentsError('');
+        setUiBanner((prev) => (prev.type === 'error' && prev.message === 'Pending payments are temporarily unavailable.' ? { type: '', message: '' } : prev));
       } catch (_) {
         if (mounted) {
           setPendingPayments([]);
@@ -113,6 +125,9 @@ export default function DriverHomeScreen() {
   if (initializing) return null;
 
   const selectedParking = parkings.find((p) => p.id === selectedParkingId) || null;
+  const hasActiveSession = activeSessions.length > 0;
+  const hasReservedBooking = activeBookings.some((booking) => booking.status === 'reserved');
+  const flowState = hasActiveSession ? 'Approved / Active Session' : hasReservedBooking ? 'Reserve Complete / Awaiting Check-In' : 'Reserve';
   const selectedCoords = parkingCoords(selectedParking);
   const mapCoords = parkings
     .map((parking) => ({ parking, coords: parkingCoords(parking) }))
@@ -223,6 +238,17 @@ export default function DriverHomeScreen() {
         <Text style={styles.title}>Driver Dashboard</Text>
       </View>
 
+      {uiBanner.message ? (
+        <View style={[styles.banner, uiBanner.type === 'error' ? styles.errorBanner : styles.successBanner]}>
+          <Text style={[styles.smallText, uiBanner.type === 'error' ? styles.errorBannerText : styles.successBannerText]}>{uiBanner.message}</Text>
+        </View>
+      ) : null}
+
+      <Card title="Booking Flow State">
+        <Text style={styles.smallText}>Reserve → QR/Manual Check-In → Pending Approval → Approved/Active Session</Text>
+        <Text style={styles.body}>{flowState}</Text>
+      </Card>
+
       <Card title="QR Check-In">
         <Text style={styles.smallText}>Scan operator QR with your phone camera or paste token/link.</Text>
         <View style={styles.rowGap}>
@@ -316,15 +342,20 @@ export default function DriverHomeScreen() {
         ) : (
           activeSessions.map((session) => {
             const pending = pendingPayments.some((item) => item.sessionId === session.id);
+            const isActiveSession = session.status === 'active';
+            const paymentConfirmed = session.paymentStatus === 'confirmed';
+            const canCheckout = isActiveSession && !pending && !paymentConfirmed;
             return (
               <View key={session.id} style={styles.listItem}>
                 <Text style={styles.body}>{session.plateNumber}</Text>
                 <Text style={styles.smallText}>Parking: {session.parkingId}</Text>
+                {!isActiveSession ? <Text style={styles.warning}>Checkout unavailable: session is not active.</Text> : null}
+                {paymentConfirmed ? <Text style={styles.smallText}>Payment already confirmed for this session.</Text> : null}
                 {pending ? <Text style={styles.pendingText}>Payment submitted. Waiting for operator.</Text> : null}
                 <Button
                   title="Checkout & Submit Payment"
                   variant="secondary"
-                  disabled={pending || checkoutLoading === session.id}
+                  disabled={!canCheckout || checkoutLoading === session.id}
                   loading={checkoutLoading === session.id}
                   onPress={() => openPaymentModal(session)}
                 />
@@ -344,7 +375,7 @@ export default function DriverHomeScreen() {
               <Text style={styles.body}>{request.plateNumber || 'Unknown plate'}</Text>
               <Text style={styles.smallText}>Amount: {request.amountDue || 0} ETB</Text>
               <Text style={styles.smallText}>Method: {request.method || 'N/A'}</Text>
-              <Text style={styles.smallText}>Submitted: {toDateTime(request.submittedAt)}</Text>
+              <Text style={styles.smallText}>Submitted: {toDateTime(request.submittedAtMs || request.submittedAt)}</Text>
             </View>
           ))
         )}
@@ -464,6 +495,22 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.h3, color: colors.text },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
+  banner: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  errorBanner: {
+    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+  },
+  successBanner: {
+    borderColor: '#6ee7b7',
+    backgroundColor: '#ecfdf5',
+  },
+  errorBannerText: { color: '#b91c1c' },
+  successBannerText: { color: '#065f46' },
   warning: { ...typography.caption, color: colors.warning, marginBottom: spacing.sm },
   rowGap: { gap: spacing.xs },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },

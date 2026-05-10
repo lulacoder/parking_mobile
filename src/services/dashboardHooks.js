@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { firestore } from '../config/firebase';
 import { auth } from '../config/firebase';
 import {
+  adminArchiveOwner,
+  adminRestoreOwner,
   getAdminAnalytics,
   getOwnerAnalytics,
   createOwnerAccount,
@@ -84,6 +86,32 @@ export function useUpsertParking() {
 export function useAssignOperatorToParking() {
   const handlers = useRefreshAfterMutation([qk.operators(), qk.parkings()]);
   return useMutation({ mutationFn: assignOperatorToParking, ...handlers });
+}
+
+export function useAdminArchiveOwner() {
+  const handlers = useRefreshAfterMutation([
+    qk.owners(),
+    qk.parkings(),
+    qk.operators(),
+    qk.adminAnalytics('7d'),
+    qk.adminAnalytics('30d'),
+    qk.ownerAnalytics('7d'),
+    qk.ownerAnalytics('30d'),
+  ]);
+  return useMutation({ mutationFn: adminArchiveOwner, ...handlers });
+}
+
+export function useAdminRestoreOwner() {
+  const handlers = useRefreshAfterMutation([
+    qk.owners(),
+    qk.parkings(),
+    qk.operators(),
+    qk.adminAnalytics('7d'),
+    qk.adminAnalytics('30d'),
+    qk.ownerAnalytics('7d'),
+    qk.ownerAnalytics('30d'),
+  ]);
+  return useMutation({ mutationFn: adminRestoreOwner, ...handlers });
 }
 
 export function useOwnerCreateOperator() {

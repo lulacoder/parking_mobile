@@ -20,6 +20,14 @@ export async function assignOperatorToParking(payload) {
   return callFunction('assignOperatorToParking', payload);
 }
 
+export async function adminArchiveOwner(payload) {
+  return callFunction('adminArchiveOwner', payload);
+}
+
+export async function adminRestoreOwner(payload) {
+  return callFunction('adminRestoreOwner', payload);
+}
+
 export async function ownerCreateOperator(payload) {
   return callFunction('ownerCreateOperator', payload);
 }

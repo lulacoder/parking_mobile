@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
 import { useProtectedRoute } from '../../../src/hooks/useProtectedRoute';
@@ -8,6 +8,8 @@ import Button from '../../../src/components/common/Button';
 import { colors, radius, shadows, spacing, typography } from '../../../src/constants/theme';
 import {
   useAdminAnalytics,
+  useAdminArchiveOwner,
+  useAdminRestoreOwner,
   useAssignOperatorToParking,
   useCreateOwnerAccount,
   useOperatorsList,
@@ -36,6 +38,8 @@ export default function AdminHomeScreen() {
   const createOwner = useCreateOwnerAccount();
   const upsertParking = useUpsertParking();
   const assignOperator = useAssignOperatorToParking();
+  const archiveOwner = useAdminArchiveOwner();
+  const restoreOwner = useAdminRestoreOwner();
 
   const owners = ownersQuery.data || [];
   const parkings = parkingsQuery.data || [];
@@ -66,6 +70,9 @@ export default function AdminHomeScreen() {
   });
 
   const [assignmentForm, setAssignmentForm] = useState({ operatorUid: '', parkingId: '', assign: true });
+  const [banner, setBanner] = useState({ type: '', message: '' });
+  const [archiveReason, setArchiveReason] = useState('');
+  const [lifecycleModal, setLifecycleModal] = useState({ visible: false, mode: 'archive', owner: null });
 
   if (initializing) return null;
 
@@ -73,6 +80,9 @@ export default function AdminHomeScreen() {
   const summary = analytics?.summary || {};
   const revenueSeries = analytics?.revenueSeries || [];
   const paymentBreakdown = analytics?.paymentMethodBreakdown || [];
+  const lifecycleOwnerId = lifecycleModal.owner?.ownerId || lifecycleModal.owner?.id || '';
+  const lifecycleOwnerParkings = parkings.filter((parking) => String(parking.ownerId || '') === lifecycleOwnerId);
+  const lifecycleOwnerOperators = operators.filter((operator) => String(operator.ownerId || '') === lifecycleOwnerId);
 
   const revenueData = useMemo(
     () => ({
@@ -104,15 +114,15 @@ export default function AdminHomeScreen() {
 
   const submitOwner = async () => {
     if (!ownerForm.fullName || !ownerForm.email || !ownerForm.password) {
-      Alert.alert('Missing data', 'fullName, email and password are required.');
+      setBanner({ type: 'error', message: 'fullName, email and password are required.' });
       return;
     }
     try {
       await createOwner.mutateAsync(ownerForm);
-      Alert.alert('Success', 'Owner account created.');
+      setBanner({ type: 'success', message: 'Owner account created.' });
       setOwnerForm({ fullName: '', email: '', password: '', phone: '', bankAccountNumber: '' });
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to create owner account');
+      setBanner({ type: 'error', message: error.message || 'Failed to create owner account' });
     }
   };
 
@@ -120,7 +130,7 @@ export default function AdminHomeScreen() {
     const lat = Number(parkingForm.lat);
     const lng = Number(parkingForm.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-      Alert.alert('Invalid location', 'Latitude and longitude are required.');
+      setBanner({ type: 'error', message: 'Latitude and longitude are required.' });
       return;
     }
 
@@ -135,23 +145,58 @@ export default function AdminHomeScreen() {
         lat,
         lng,
       });
-      Alert.alert('Saved', 'Parking saved successfully.');
+      setBanner({ type: 'success', message: 'Parking saved successfully.' });
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to save parking');
+      setBanner({ type: 'error', message: error.message || 'Failed to save parking' });
     }
   };
 
   const submitAssignment = async () => {
     if (!assignmentForm.operatorUid || !assignmentForm.parkingId) {
-      Alert.alert('Missing data', 'Select operator and parking.');
+      setBanner({ type: 'error', message: 'Select operator and parking.' });
       return;
     }
 
     try {
       await assignOperator.mutateAsync(assignmentForm);
-      Alert.alert('Saved', 'Operator assignment updated.');
+      setBanner({ type: 'success', message: 'Operator assignment updated.' });
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to update assignment');
+      setBanner({ type: 'error', message: error.message || 'Failed to update assignment' });
+    }
+  };
+
+  const openLifecycleModal = (mode, owner) => {
+    setArchiveReason('');
+    setBanner({ type: '', message: '' });
+    setLifecycleModal({ visible: true, mode, owner });
+  };
+
+  const closeLifecycleModal = () => {
+    if (archiveOwner.isPending || restoreOwner.isPending) return;
+    setLifecycleModal({ visible: false, mode: 'archive', owner: null });
+    setArchiveReason('');
+  };
+
+  const runLifecycleAction = async () => {
+    if (!lifecycleModal.owner) return;
+    const ownerId = lifecycleModal.owner.ownerId || lifecycleModal.owner.id;
+    try {
+      if (lifecycleModal.mode === 'archive') {
+        const result = await archiveOwner.mutateAsync({ ownerId, reason: archiveReason.trim() || undefined });
+        setBanner({
+          type: 'success',
+          message: `Owner deactivated. Parkings affected: ${result?.parkingsAffected || 0}, operators affected: ${result?.operatorsAffected || 0}.`,
+        });
+      } else {
+        const result = await restoreOwner.mutateAsync({ ownerId });
+        setBanner({
+          type: 'success',
+          message: `Owner reactivated. Parkings restored: ${result?.restoredParkings || 0}, operators restored: ${result?.restoredOperators || 0}.`,
+        });
+      }
+      closeLifecycleModal();
+    } catch (error) {
+      setBanner({ type: 'error', message: error.message || 'Owner lifecycle action failed.' });
     }
   };
 
@@ -161,6 +206,12 @@ export default function AdminHomeScreen() {
         <Text style={styles.kicker}>Platform Intelligence</Text>
         <Text style={styles.title}>Admin Dashboard</Text>
       </View>
+
+      {banner.message ? (
+        <View style={[styles.banner, banner.type === 'error' ? styles.errorBanner : styles.successBanner]}>
+          <Text style={[styles.smallText, banner.type === 'error' ? styles.errorBannerText : styles.successBannerText]}>{banner.message}</Text>
+        </View>
+      ) : null}
 
       <Card title="Analytics Range">
         <View style={styles.row}>
@@ -267,6 +318,34 @@ export default function AdminHomeScreen() {
         </View>
       </Card>
 
+      <Card title="Owner Lifecycle Controls">
+        <Text style={styles.smallText}>
+          Deactivate blocks owner operations and deactivates linked parkings/operators while preserving historical revenue.
+        </Text>
+        {!owners.length ? (
+          <Text style={styles.smallText}>No owners found.</Text>
+        ) : (
+          owners.map((owner) => {
+            const ownerId = owner.ownerId || owner.id;
+            const archived = String(owner.status || '').toLowerCase() === 'archived';
+            return (
+              <View key={owner.id} style={styles.listItem}>
+                <Text style={styles.body}>{owner.fullName || owner.email || ownerId}</Text>
+                <Text style={styles.smallText}>{owner.email || 'no-email'}</Text>
+                <Text style={styles.smallText}>Status: {owner.status || 'active'}</Text>
+                <Button
+                  title={archived ? 'Reactivate Owner' : 'Deactivate Owner'}
+                  variant={archived ? 'secondary' : 'primary'}
+                  onPress={() => openLifecycleModal(archived ? 'restore' : 'archive', owner)}
+                  loading={archiveOwner.isPending || restoreOwner.isPending}
+                  disabled={archiveOwner.isPending || restoreOwner.isPending}
+                />
+              </View>
+            );
+          })
+        )}
+      </Card>
+
       <Card title="Current Owners">
         {!owners.length ? (
           <Text style={styles.smallText}>No owners found.</Text>
@@ -311,6 +390,52 @@ export default function AdminHomeScreen() {
           ))
         )}
       </Card>
+
+      <Modal visible={lifecycleModal.visible} transparent animationType="fade" onRequestClose={closeLifecycleModal}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.cardTitle}>{lifecycleModal.mode === 'archive' ? 'Deactivate Owner' : 'Reactivate Owner'}</Text>
+            {!lifecycleModal.owner ? null : (
+              <>
+                <Text style={styles.body}>{lifecycleModal.owner.fullName || lifecycleModal.owner.email || lifecycleOwnerId}</Text>
+                <Text style={styles.smallText}>Owner ID: {lifecycleOwnerId}</Text>
+                <Text style={styles.smallText}>
+                  Parkings affected: {lifecycleOwnerParkings.length} | Operators affected: {lifecycleOwnerOperators.length}
+                </Text>
+                {lifecycleModal.mode === 'archive' ? (
+                  <>
+                    <Text style={styles.smallText}>
+                      Deactivation is blocked when active sessions or unexpired reserved bookings exist for this owner.
+                    </Text>
+                    <Input placeholder="Reason (optional)" value={archiveReason} onChangeText={setArchiveReason} />
+                  </>
+                ) : (
+                  <Text style={styles.smallText}>
+                    Reactivate restores operator/parking state from the last deactivate snapshot.
+                  </Text>
+                )}
+                <View style={styles.row}>
+                  <Button title="Cancel" variant="secondary" onPress={closeLifecycleModal} />
+                  <Button
+                    title={
+                      lifecycleModal.mode === 'archive'
+                        ? archiveOwner.isPending
+                          ? 'Deactivating...'
+                          : 'Confirm Deactivate'
+                        : restoreOwner.isPending
+                        ? 'Reactivating...'
+                        : 'Confirm Reactivate'
+                    }
+                    onPress={runLifecycleAction}
+                    loading={archiveOwner.isPending || restoreOwner.isPending}
+                    disabled={archiveOwner.isPending || restoreOwner.isPending}
+                  />
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -364,6 +489,26 @@ const styles = StyleSheet.create({
   cardTitle: { ...typography.h3, color: colors.text },
   body: { ...typography.body, color: colors.text },
   smallText: { ...typography.caption, color: colors.textSecondary },
+  banner: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  errorBanner: {
+    borderColor: '#fca5a5',
+    backgroundColor: '#fef2f2',
+  },
+  successBanner: {
+    borderColor: '#6ee7b7',
+    backgroundColor: '#ecfdf5',
+  },
+  errorBannerText: {
+    color: '#b91c1c',
+  },
+  successBannerText: {
+    color: '#065f46',
+  },
   chart: { marginVertical: spacing.sm, borderRadius: 8 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   listItem: {
@@ -373,5 +518,19 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     marginBottom: spacing.sm,
     backgroundColor: colors.surfaceMuted,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    justifyContent: 'center',
+    padding: spacing.md,
+  },
+  modalCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    gap: spacing.sm,
   },
 });

@@ -108,6 +108,8 @@ export const adminFunctions = {
     callFunction('upsertParking', { ...parkingData, parkingId }),
   assignOperatorToParking: async (operatorUid, parkingId, assign = true) =>
     callFunction('assignOperatorToParking', { operatorUid, parkingId, assign }),
+  archiveOwner: async (ownerId, reason = '') => callFunction('adminArchiveOwner', { ownerId, reason }),
+  restoreOwner: async (ownerId) => callFunction('adminRestoreOwner', { ownerId }),
 };
 
 export const utilityFunctions = {

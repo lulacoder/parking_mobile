@@ -229,6 +229,11 @@ export default function OperatorHomeScreen() {
     () => parkings.find((parking) => parking.id === selectedParkingId) || null,
     [parkings, selectedParkingId]
   );
+  const flowState = activeSessions.length
+    ? 'Approved / Active Session'
+    : pendingRequests.length
+    ? 'Pending Approval'
+    : 'QR / Manual Check-In';
 
   const withAction = async (name, work) => {
     setActionLoading(name);
@@ -293,6 +298,11 @@ export default function OperatorHomeScreen() {
           <Text style={styles.warningText}>{listenerWarning}</Text>
         </View>
       ) : null}
+
+      <Card title="Check-In Flow State">
+        <Text style={styles.smallText}>Reserve → QR/Manual Check-In → Pending Approval → Approved/Active Session</Text>
+        <Text style={styles.body}>{flowState}</Text>
+      </Card>
 
       <Card title="Assigned Parking">
         {!parkings.length ? (
