@@ -66,18 +66,20 @@ export const callFunction = async (functionName, data = {}) => {
 };
 
 export const driverFunctions = {
-  createBooking: async (parkingId, plateNumber) => callFunction('createBooking', { parkingId, plateNumber }),
+  createBooking: async (parkingId, plateNumber, startTimeMs = null, endTimeMs = null) =>
+    callFunction('createBooking', { parkingId, plateNumber, startTimeMs, endTimeMs }),
   submitManualPayment: async (parkingId, plateNumber, method, referenceCode) =>
     callFunction('submitManualPayment', { parkingId, plateNumber, method, referenceCode }),
   checkOutVehicle: async (parkingId, plateNumber, method, referenceCode) =>
     callFunction('driverCheckOutVehicle', { parkingId, plateNumber, method, referenceCode }),
+  topUpWallet: async (amount) => callFunction('topUpWallet', { amount }),
   listPendingPayments: async () => callFunction('listPendingPaymentsForDriver', {}),
   confirmCheckInFromQr: async (token, plateNumber) => callFunction('confirmCheckInFromQr', { token, plateNumber }),
 };
 
 export const operatorFunctions = {
-  checkInVehicle: async (parkingId, plateNumber, allowWalkIn = false) =>
-    callFunction('checkInVehicle', { parkingId, plateNumber, allowWalkIn }),
+  checkInVehicle: async (parkingId, plateNumber = '', allowWalkIn = false, reservationCode = '') =>
+    callFunction('checkInVehicle', { parkingId, plateNumber, allowWalkIn, reservationCode }),
   listPendingPayments: async (parkingId) => callFunction('listPendingPaymentsForOperator', { parkingId }),
   getPendingPaymentForSession: async (sessionId) => callFunction('getPendingPaymentForSession', { sessionId }),
   confirmManualPayment: async (requestId) => callFunction('confirmManualPayment', { requestId }),
@@ -87,6 +89,8 @@ export const operatorFunctions = {
   approveCheckInRequest: async (requestId) => callFunction('approveCheckInRequest', { requestId }),
   rejectCheckInRequest: async (requestId, reason = 'Request denied') =>
     callFunction('rejectCheckInRequest', { requestId, reason }),
+  checkOutVehicle: async (parkingId, plateNumber, paymentMethod) =>
+    callFunction('checkOutVehicle', { parkingId, plateNumber, paymentMethod }),
 };
 
 export const ownerFunctions = {

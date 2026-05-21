@@ -100,6 +100,8 @@ describe('Firebase Functions Utility', () => {
       expect(mockCallable).toHaveBeenCalledWith({
         parkingId: 'parking-123',
         plateNumber: 'ABC-123',
+        startTimeMs: null,
+        endTimeMs: null,
       });
     });
 
@@ -146,6 +148,7 @@ describe('Firebase Functions Utility', () => {
         parkingId: 'parking-123',
         plateNumber: 'ABC-123',
         allowWalkIn: true,
+        reservationCode: '',
       });
     });
 

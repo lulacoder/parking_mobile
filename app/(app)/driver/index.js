@@ -44,6 +44,14 @@ export default function DriverHomeScreen() {
   const [paymentDestination, setPaymentDestination] = useState({ phone: '', bankAccountNumber: '' });
   const [loadingDestination, setLoadingDestination] = useState(false);
 
+  // New states for feature enhancements
+  const [driverProfile, setDriverProfile] = useState(null);
+  const [reserveStartTimeOption, setReserveStartTimeOption] = useState('now');
+  const [reserveDurationOption, setReserveDurationOption] = useState(1);
+  const [receiptModalVisible, setReceiptModalVisible] = useState(false);
+  const [receiptDetails, setReceiptDetails] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+
   useEffect(() => {
     const unsubscribe = firestore
       .collection('parkings')
@@ -62,6 +70,28 @@ export default function DriverHomeScreen() {
 
     return () => unsubscribe();
   }, [selectedParkingId]);
+
+  // Subscribe to driver user profile for wallet balance
+  useEffect(() => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) return undefined;
+
+    const unsubProfile = firestore
+      .collection('users')
+      .doc(uid)
+      .onSnapshot(
+        (doc) => {
+          if (doc.exists) {
+            setDriverProfile(doc.data());
+          } else {
+            setDriverProfile({ walletBalance: 100.00 });
+          }
+        },
+        (error) => setUiBanner({ type: 'error', message: error.message || 'Failed to load wallet profile' })
+      );
+
+    return () => unsubProfile();
+  }, []);
 
   useEffect(() => {
     const uid = auth.currentUser?.uid;
@@ -129,16 +159,50 @@ export default function DriverHomeScreen() {
   const hasReservedBooking = activeBookings.some((booking) => booking.status === 'reserved');
   const flowState = hasActiveSession ? 'Approved / Active Session' : hasReservedBooking ? 'Reserve Complete / Awaiting Check-In' : 'Reserve';
   const selectedCoords = parkingCoords(selectedParking);
-  const mapCoords = parkings
-    .map((parking) => ({ parking, coords: parkingCoords(parking) }))
-    .filter((item) => Boolean(item.coords));
 
-  const initialRegion =
-    selectedCoords ||
-    mapCoords[0]?.coords || {
-      latitude: 8.997,
-      longitude: 38.786,
+  const handleTopUp = async (amount) => {
+    try {
+      setWalletLoading(true);
+      const res = await driverFunctions.topUpWallet(amount);
+      Alert.alert('Success', `Successfully topped up ${amount.toFixed(2)} ETB.\nNew Balance: ${res.newBalance.toFixed(2)} ETB`);
+    } catch (error) {
+      Alert.alert('Top up failed', error.message || 'Unable to top up');
+    } finally {
+      setWalletLoading(false);
+    }
+  };
+
+  const handleWalletCheckout = async (session) => {
+    try {
+      setCheckoutLoading(session.id);
+      const result = await driverFunctions.checkOutVehicle(
+        session.parkingId,
+        session.plateNumber
+      );
+      setReceiptDetails(result.receipt);
+      setReceiptModalVisible(true);
+    } catch (error) {
+      Alert.alert('Checkout failed', error.message || 'Unable to checkout');
+    } finally {
+      setCheckoutLoading('');
+    }
+  };
+
+  // Textual Routing Helper
+  const getNavigationDirections = (spotId) => {
+    if (!spotId) return null;
+    const zone = spotId.charAt(0).toUpperCase();
+    const num = spotId.substring(1);
+    return {
+      driving: `🚗 Driving Directions to Spot ${spotId}:\n1. Drive through the entrance gate.\n2. Proceed straight and follow the lane signs for Zone ${zone}.\n3. Locate Spot ${spotId} in Row ${zone === 'A' ? '1' : '2'} (it's space #${num} on the right).`,
+      walking: `🚶 Walking Directions back to Spot ${spotId}:\n1. Leave through the pedestrian elevator near the main lobby.\n2. Head ${zone === 'A' ? 'left' : 'right'} down the pedestrian corridor.\n3. Spot ${spotId} is located in Zone ${zone}, Row ${zone === 'A' ? '1' : '2'}.`
     };
+  };
+
+  const activeSessionWithSpot = activeSessions.find(s => s.spotId);
+  const activeBookingWithSpot = activeBookings.find(b => b.spotId);
+  const navigationSpotId = activeSessionWithSpot?.spotId || activeBookingWithSpot?.spotId;
+  const navigationDirections = getNavigationDirections(navigationSpotId);
 
   const openQrConfirm = (input = '') => {
     const value = String(input || '').trim();
@@ -169,8 +233,19 @@ export default function DriverHomeScreen() {
 
     try {
       setLoadingReserve(true);
-      const response = await driverFunctions.createBooking(selectedParkingId, normalizePlate(plateNumber));
-      Alert.alert('Success', `Booking created: ${response.bookingId}`);
+      const now = Date.now();
+      let startTimeMs = now;
+      if (reserveStartTimeOption === '15m') startTimeMs = now + 15 * 60 * 1000;
+      else if (reserveStartTimeOption === '30m') startTimeMs = now + 30 * 60 * 1000;
+      const endTimeMs = startTimeMs + reserveDurationOption * 60 * 60 * 1000;
+
+      const response = await driverFunctions.createBooking(
+        selectedParkingId,
+        normalizePlate(plateNumber),
+        startTimeMs,
+        endTimeMs
+      );
+      Alert.alert('Success', `Booking created!\nSpot Allocated: ${response.spotId || 'N/A'}\nReservation Code: ${response.reservationCode || 'N/A'}\nHold Fee: 20.00 ETB deducted.`);
       setPlateNumber('');
     } catch (error) {
       Alert.alert('Booking failed', error.message || 'Unable to reserve slot');
@@ -238,6 +313,66 @@ export default function DriverHomeScreen() {
         <Text style={styles.title}>Driver Dashboard</Text>
       </View>
 
+      {/* ETB Wallet Card */}
+      <View style={styles.walletCard}>
+        <View style={styles.walletHeader}>
+          <MaterialIcons name="account-balance-wallet" size={20} color={colors.surface} />
+          <Text style={styles.walletLabel}>ETB DIGITAL WALLET</Text>
+        </View>
+        <Text style={styles.walletBalance}>
+          {(driverProfile?.walletBalance !== undefined ? driverProfile.walletBalance : 100.00).toFixed(2)} ETB
+        </Text>
+        <Text style={styles.walletSubtext}>Instant checkout deductions & reservation bookings</Text>
+        
+        <View style={styles.quickTopUpRow}>
+          <Text style={styles.topUpLabel}>Quick top-up wallet:</Text>
+          <View style={styles.topUpButtons}>
+            <TouchableOpacity 
+              style={styles.topUpBtn} 
+              onPress={() => handleTopUp(100)}
+              disabled={walletLoading}
+            >
+              <Text style={styles.topUpBtnText}>+100.00 ETB</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.topUpBtn} 
+              onPress={() => handleTopUp(200)}
+              disabled={walletLoading}
+            >
+              <Text style={styles.topUpBtnText}>+200.00 ETB</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.topUpBtn} 
+              onPress={() => handleTopUp(500)}
+              disabled={walletLoading}
+            >
+              <Text style={styles.topUpBtnText}>+500.00 ETB</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Navigation Directions Box */}
+      {navigationDirections ? (
+        <Card title="Navigation Directions">
+          <View style={styles.navBlock}>
+            <Text style={styles.navSpotHeader}>
+              Assigned Spot: <Text style={styles.navSpotValue}>{navigationSpotId}</Text>
+            </Text>
+            
+            <View style={styles.directionSection}>
+              <Text style={styles.directionText}>{navigationDirections.driving}</Text>
+            </View>
+            
+            <View style={styles.directionDivider} />
+            
+            <View style={styles.directionSection}>
+              <Text style={styles.directionText}>{navigationDirections.walking}</Text>
+            </View>
+          </View>
+        </Card>
+      ) : null}
+
       {uiBanner.message ? (
         <View style={[styles.banner, uiBanner.type === 'error' ? styles.errorBanner : styles.successBanner]}>
           <Text style={[styles.smallText, uiBanner.type === 'error' ? styles.errorBannerText : styles.successBannerText]}>{uiBanner.message}</Text>
@@ -263,11 +398,7 @@ export default function DriverHomeScreen() {
         </View>
       </Card>
 
-      <Card title="Choose Parking on Map">
-        {!Constants.expoConfig?.extra?.googleMapsApiKey ? (
-          <Text style={styles.warning}>Google Maps API key missing. Add `GOOGLE_MAPS_API_KEY` to `.env`.</Text>
-        ) : null}
-
+      <Card title="Choose Parking">
         <View style={styles.chipWrap}>
           {parkings.map((parking) => (
             <TouchableOpacity
@@ -287,7 +418,7 @@ export default function DriverHomeScreen() {
         <View style={styles.mapContainer}>
           <View style={styles.mapFallback}>
             <Text style={styles.smallText}>
-              Map preview is not available in this runtime. Open the selected parking in Google Maps.
+              Graphical maps are disabled for efficiency. Open coordinates below in Google Maps.
             </Text>
             {selectedCoords ? (
               <Text style={styles.smallText}>
@@ -299,14 +430,61 @@ export default function DriverHomeScreen() {
         </View>
       </Card>
 
+      {/* Upgraded Reserve Slot Card with date-time duration selections */}
       <Card title="Reserve Slot">
+        <Text style={styles.fieldLabel}>Plate Number</Text>
         <Input
-          placeholder="Plate Number"
+          placeholder="Plate Number (e.g., AA-1-A12345)"
           value={plateNumber}
           onChangeText={(value) => setPlateNumber(normalizePlate(value))}
           autoCapitalize="characters"
         />
-        <Button title={loadingReserve ? 'Reserving...' : 'Reserve'} loading={loadingReserve} onPress={reserveSlot} />
+
+        <Text style={styles.fieldLabel}>Start Time</Text>
+        <View style={styles.chipRow}>
+          <TouchableOpacity
+            style={[styles.timeChip, reserveStartTimeOption === 'now' && styles.chipActive]}
+            onPress={() => setReserveStartTimeOption('now')}
+          >
+            <Text style={[styles.timeChipText, reserveStartTimeOption === 'now' && styles.timeChipTextActive]}>Now</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.timeChip, reserveStartTimeOption === '15m' && styles.chipActive]}
+            onPress={() => setReserveStartTimeOption('15m')}
+          >
+            <Text style={[styles.timeChipText, reserveStartTimeOption === '15m' && styles.timeChipTextActive]}>In 15 Mins</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.timeChip, reserveStartTimeOption === '30m' && styles.chipActive]}
+            onPress={() => setReserveStartTimeOption('30m')}
+          >
+            <Text style={[styles.timeChipText, reserveStartTimeOption === '30m' && styles.timeChipTextActive]}>In 30 Mins</Text>
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.fieldLabel}>Duration Block</Text>
+        <View style={styles.chipRow}>
+          {[1, 2, 3, 5, 8].map((h) => (
+            <TouchableOpacity
+              key={h}
+              style={[styles.timeChip, reserveDurationOption === h && styles.chipActive]}
+              onPress={() => setReserveDurationOption(h)}
+            >
+              <Text style={[styles.timeChipText, reserveDurationOption === h && styles.timeChipTextActive]}>
+                {h} Hour{h > 1 ? 's' : ''}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <View style={styles.feeInfoContainer}>
+          <MaterialIcons name="info-outline" size={16} color="#B45309" />
+          <Text style={styles.feeInfoText}>
+            Holds Spot. Fee: $20.00 hold fee. Releasing spot past 15-min grace period incurs a $15.00 no-show penalty.
+          </Text>
+        </View>
+
+        <Button title={loadingReserve ? 'Reserving...' : 'Reserve Spot'} loading={loadingReserve} onPress={reserveSlot} />
       </Card>
 
       <Card title="Selected Parking">
@@ -329,7 +507,8 @@ export default function DriverHomeScreen() {
           activeBookings.map((booking) => (
             <View key={booking.id} style={styles.listItem}>
               <Text style={styles.body}>{booking.plateNumber}</Text>
-              <Text style={styles.smallText}>Status: {booking.status}</Text>
+              <Text style={styles.smallText}>Spot ID: <Text style={{fontWeight: 'bold', color: colors.primary}}>{booking.spotId || 'Pending'}</Text></Text>
+              <Text style={styles.smallText}>Reservation Code: <Text style={{fontWeight: 'bold', color: colors.warning}}>{booking.reservationCode || 'N/A'}</Text></Text>
               <Text style={styles.smallText}>Expires: {toDateTime(booking.expiresAt)}</Text>
             </View>
           ))
@@ -349,16 +528,25 @@ export default function DriverHomeScreen() {
               <View key={session.id} style={styles.listItem}>
                 <Text style={styles.body}>{session.plateNumber}</Text>
                 <Text style={styles.smallText}>Parking: {session.parkingId}</Text>
+                <Text style={styles.smallText}>Spot ID: <Text style={{fontWeight: 'bold', color: colors.success}}>{session.spotId || 'N/A'}</Text></Text>
                 {!isActiveSession ? <Text style={styles.warning}>Checkout unavailable: session is not active.</Text> : null}
                 {paymentConfirmed ? <Text style={styles.smallText}>Payment already confirmed for this session.</Text> : null}
                 {pending ? <Text style={styles.pendingText}>Payment submitted. Waiting for operator.</Text> : null}
-                <Button
-                  title="Checkout & Submit Payment"
-                  variant="secondary"
-                  disabled={!canCheckout || checkoutLoading === session.id}
-                  loading={checkoutLoading === session.id}
-                  onPress={() => openPaymentModal(session)}
-                />
+                
+                <View style={{flexDirection: 'column', gap: 6, marginTop: 8}}>
+                  <Button
+                    title="Instant Wallet Checkout"
+                    disabled={!canCheckout || checkoutLoading === session.id}
+                    loading={checkoutLoading === session.id}
+                    onPress={() => handleWalletCheckout(session)}
+                  />
+                  <Button
+                    title="Submit Manual Payment"
+                    variant="secondary"
+                    disabled={!canCheckout || checkoutLoading === session.id}
+                    onPress={() => openPaymentModal(session)}
+                  />
+                </View>
               </View>
             );
           })
@@ -381,6 +569,7 @@ export default function DriverHomeScreen() {
         )}
       </Card>
 
+      {/* Manual Payment Modal */}
       <Modal visible={paymentModalVisible} transparent animationType="slide" onRequestClose={() => setPaymentModalVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
@@ -442,6 +631,62 @@ export default function DriverHomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Itemized Wallet Checkout Receipt Modal */}
+      <Modal visible={receiptModalVisible} transparent animationType="slide" onRequestClose={() => setReceiptModalVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <View style={styles.receiptSuccessHeader}>
+              <MaterialIcons name="check-circle" size={40} color={colors.success} />
+              <Text style={styles.receiptSuccessTitle}>Checkout Complete!</Text>
+            </View>
+            
+            <View style={styles.gateAlertBanner}>
+              <MaterialIcons name="door-sliding" size={24} color={colors.success} />
+              <Text style={styles.gateAlertText}>Exit Gate Unlocked! Drive safely.</Text>
+            </View>
+
+            {receiptDetails ? (
+              <View style={styles.receiptContent}>
+                <Text style={styles.receiptKicker}>ITEMIZED DIGITAL RECEIPT</Text>
+                
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptItemLabel}>Duration:</Text>
+                  <Text style={styles.receiptItemValue}>
+                    {receiptDetails.billedHours} hr{receiptDetails.billedHours > 1 ? 's' : ''} ({receiptDetails.durationMinutes} mins)
+                  </Text>
+                </View>
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptItemLabel}>Base Fare:</Text>
+                  <Text style={styles.receiptItemValue}>${receiptDetails.baseFare.toFixed(2)} ETB</Text>
+                </View>
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptItemLabel}>VAT (15%):</Text>
+                  <Text style={styles.receiptItemValue}>${receiptDetails.tax.toFixed(2)} ETB</Text>
+                </View>
+
+                <View style={styles.receiptDivider} />
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptItemLabelTotal}>Total Deducted:</Text>
+                  <Text style={styles.receiptItemValueTotal}>${receiptDetails.amountDue.toFixed(2)} ETB</Text>
+                </View>
+
+                <View style={styles.receiptDivider} />
+
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptItemLabel}>Remaining Balance:</Text>
+                  <Text style={styles.receiptItemValue}>${receiptDetails.remainingBalance.toFixed(2)} ETB</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <Button title="Dismiss" variant="secondary" style={{ marginTop: 16 }} onPress={() => setReceiptModalVisible(false)} />
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -472,6 +717,143 @@ const styles = StyleSheet.create({
   },
   kicker: { ...typography.small, color: '#BFDBFE', textTransform: 'uppercase', letterSpacing: 1.2, marginBottom: spacing.xs },
   title: { ...typography.h1, color: colors.surface },
+  
+  // Wallet Styling
+  walletCard: {
+    backgroundColor: '#1E40AF',
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  walletHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  walletLabel: {
+    ...typography.small,
+    color: '#93C5FD',
+    fontWeight: 'bold',
+    letterSpacing: 1,
+  },
+  walletBalance: {
+    ...typography.h1,
+    color: colors.surface,
+    fontWeight: '800',
+    marginVertical: spacing.xs,
+  },
+  walletSubtext: {
+    ...typography.small,
+    color: '#E0F2FE',
+    marginBottom: spacing.md,
+  },
+  quickTopUpRow: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.15)',
+    paddingTop: spacing.sm,
+  },
+  topUpLabel: {
+    ...typography.caption,
+    color: '#93C5FD',
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  topUpButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  topUpBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 8,
+  },
+  topUpBtnText: {
+    ...typography.caption,
+    color: colors.surface,
+    fontWeight: 'bold',
+  },
+
+  // Navigation Directions Styling
+  navBlock: {
+    gap: spacing.sm,
+  },
+  navSpotHeader: {
+    ...typography.body,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  navSpotValue: {
+    color: colors.primary,
+    fontWeight: '800',
+  },
+  directionSection: {
+    backgroundColor: '#F0F9FF',
+    borderWidth: 1,
+    borderColor: '#BAE6FD',
+    borderRadius: 8,
+    padding: spacing.sm,
+  },
+  directionText: {
+    ...typography.caption,
+    color: '#0369A1',
+    lineHeight: 20,
+  },
+  directionDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.xs,
+  },
+
+  // Custom booking styling
+  fieldLabel: {
+    ...typography.caption,
+    fontWeight: 'bold',
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  timeChip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
+  timeChipText: {
+    ...typography.small,
+    color: colors.text,
+  },
+  timeChipTextActive: {
+    color: colors.primary,
+    fontWeight: 'bold',
+  },
+  feeInfoContainer: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    borderRadius: 8,
+    padding: spacing.xs,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  feeInfoText: {
+    ...typography.small,
+    color: '#B45309',
+    flex: 1,
+  },
+
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -526,8 +908,7 @@ const styles = StyleSheet.create({
   chipTitle: { ...typography.caption, color: colors.text, fontWeight: '600' },
   chipTitleActive: { color: colors.primary },
   chipMeta: { ...typography.small, color: colors.textSecondary },
-  mapContainer: { borderRadius: 8, overflow: 'hidden', height: 250, borderWidth: 1, borderColor: colors.border },
-  map: { width: '100%', height: '100%' },
+  mapContainer: { borderRadius: 8, overflow: 'hidden', height: 200, borderWidth: 1, borderColor: colors.border },
   mapFallback: {
     flex: 1,
     padding: spacing.md,
@@ -567,4 +948,76 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   modalActions: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end' },
+
+  // Receipt Modal Styling
+  receiptSuccessHeader: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginBottom: spacing.md,
+  },
+  receiptSuccessTitle: {
+    ...typography.h3,
+    color: colors.success,
+    fontWeight: 'bold',
+  },
+  gateAlertBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: 8,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  gateAlertText: {
+    ...typography.caption,
+    color: '#065F46',
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  receiptContent: {
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+  },
+  receiptKicker: {
+    ...typography.small,
+    fontWeight: 'bold',
+    color: colors.textSecondary,
+    letterSpacing: 1.2,
+    marginBottom: spacing.sm,
+  },
+  receiptRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  receiptItemLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  receiptItemValue: {
+    ...typography.caption,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  receiptDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: spacing.sm,
+  },
+  receiptItemLabelTotal: {
+    ...typography.body,
+    fontWeight: 'bold',
+    color: colors.text,
+  },
+  receiptItemValueTotal: {
+    ...typography.body,
+    fontWeight: 'bold',
+    color: colors.primary,
+  },
 });

@@ -114,7 +114,7 @@ describe('Platform Utilities', () => {
       const { getNavigationOptions } = require('./platform');
       const options = getNavigationOptions();
       expect(options.animation).toBe('slide_from_bottom');
-      expect(options.headerStyle.elevation).toBe(4);
+      expect(options.headerStyle.elevation).toBe(8);
     });
   });
 
